@@ -120,16 +120,20 @@ Press the remapped button. Your app should launch without any toast from the ori
 After initial setup, you can switch the target app at any time without re-running the full install:
 
 ```bash
-./switch.sh <TV_IP>:5555
+# Interactive mode — pick from a list
+./switch.sh [TV_IP:5555]
+
+# List available apps (non-interactive)
+./switch.sh list [TV_IP:5555]
+
+# Set target directly (non-interactive, automation-friendly)
+./switch.sh set <activity> [TV_IP:5555]
+
+# Show current mapping
+./switch.sh current [TV_IP:5555]
 ```
 
-This will:
-1. Show all installed apps on the TV
-2. Let you pick one interactively
-3. Write the config to the TV
-4. The daemon picks up the change on the next button press — no restart needed
-
-The config is stored at `/data/local/tmp/keyremap.conf` on the TV and persists across daemon restarts and TV reboots.
+The config is stored at `/data/local/tmp/keyremap.conf` on the TV. The daemon re-reads it on each button press — no restart needed.
 
 ## Persistence (Surviving TV Reboots)
 
@@ -275,7 +279,7 @@ V="${CLEAN:40:8}"
 | File | Runs On | Description |
 |------|---------|-------------|
 | `keyremap.sh` | Android TV (via adb) | Main remap daemon — generic, works on any Android TV |
-| `switch.sh` | PC/Mac/Linux | Interactively switch the target app |
+| `switch.sh` | PC/Mac/Linux | Switch target app (interactive or via `set` command) |
 | `discover.sh` | PC/Mac/Linux | Discover button scancodes |
 | `install.sh` | PC/Mac/Linux | First-time deploy (auto-detects Sony partner key) |
 | `watchdog.sh` | Always-on host | Auto-restart after TV reboot |
