@@ -1,0 +1,120 @@
+{
+  "name": "tv-keyremap",
+  "description": "Remap physical buttons on Android TV remotes to launch any app — no root required. Works by reading raw Linux input events via adb shell.",
+  "prerequisites": {
+    "adb": true,
+    "root": false,
+    "network_adb": true,
+    "always_on_host": "optional, for watchdog persistence"
+  },
+  "commands": {
+    "switch.sh": {
+      "description": "Switch the remapped target app (interactive or via subcommand)",
+      "usage": "./switch.sh [--json] <subcommand> [args] [adb_target]",
+      "interactive_usage": "./switch.sh [adb_target]",
+      "default_target": "192.168.1.209:5555",
+      "subcommands": {
+        "list": {
+          "description": "List installed apps with launcher activities",
+          "args": "[adb_target]",
+          "json_output": "[{package, activity, current}]"
+        },
+        "set": {
+          "description": "Set the remap target to a specific activity",
+          "args": "<activity> [adb_target]",
+          "json_output": "{ok, target, daemon}"
+        },
+        "current": {
+          "description": "Show the currently configured target activity",
+          "args": "[adb_target]",
+          "json_output": "{target}"
+        },
+        "status": {
+          "description": "Return full system state in one call",
+          "args": "[adb_target]",
+          "json_output": "{connected, daemon, config, script_installed}"
+        }
+      },
+      "flags": {
+        "--json": "Output structured JSON to stdout instead of human-readable text"
+      },
+      "exit_codes": {
+        "0": "success",
+        "1": "invalid usage or bad arguments",
+        "2": "cannot connect to TV (ADB unreachable)",
+        "3": "not configured (no config file or no TARGET)",
+        "4": "daemon not running (status only, informational)",
+        "5": "config write failed"
+      }
+    },
+    "install.sh": {
+      "description": "First-time deployment: push keyremap.sh to TV, write config, start daemon",
+      "usage": "./install.sh [adb_target] [scancode_le] [target_activity]",
+      "args": {
+        "adb_target": "TV IP:port (default 192.168.1.209:5555)",
+        "scancode_le": "Button scancode in little-endian hex (from discover.sh)",
+        "target_activity": "App activity to launch (e.g. com.example.app/.MainActivity)"
+      },
+      "exit_codes": {
+        "0": "success",
+        "1": "failure (missing args, cannot connect, or daemon failed to start)"
+      }
+    },
+    "discover.sh": {
+      "description": "Discover the scancode of a remote button by capturing raw input events",
+      "usage": "./discover.sh [adb_target] [duration_seconds]",
+      "args": {
+        "adb_target": "TV IP:port (default 192.168.1.209:5555)",
+        "duration_seconds": "Capture window in seconds (default 30)"
+      },
+      "exit_codes": {
+        "0": "success",
+        "1": "failure (cannot connect or no events captured)"
+      }
+    },
+    "watchdog.sh": {
+      "description": "Keepalive script — checks if daemon is running on TV, restarts if not",
+      "usage": "TV=<ip:port> /bin/sh watchdog.sh",
+      "env_vars": {
+        "TV": "TV IP:port (default 192.168.1.209:5555)",
+        "ADB": "Path to adb binary (default: adb)",
+        "KEYREMAP_DEVICE": "Override input device path",
+        "KEYREMAP_SCANCODE_LE": "Override scancode",
+        "KEYREMAP_TARGET": "Override target activity",
+        "KEYREMAP_COOLDOWN": "Override cooldown seconds",
+        "WATCHDOG_LOG": "Log file path (default /tmp/tv-keyremap-watchdog.log)"
+      },
+      "exit_codes": {
+        "0": "daemon already running or successfully restarted",
+        "1": "cannot connect to TV"
+      }
+    }
+  },
+  "config": {
+    "path": "/data/local/tmp/keyremap.conf",
+    "location": "on the Android TV (accessed via adb shell)",
+    "format": "KEY=VALUE, one per line, no quoting",
+    "schema": {
+      "DEVICE": {
+        "type": "string",
+        "description": "Linux input device path for the remote",
+        "example": "/dev/input/event3"
+      },
+      "SCANCODE_LE": {
+        "type": "string",
+        "description": "Target button scancode in little-endian hex (8 chars)",
+        "example": "53050c00"
+      },
+      "TARGET": {
+        "type": "string",
+        "description": "App activity to launch on button press",
+        "example": "com.xiaodianshi.tv.yst/.ui.main.MainActivity"
+      },
+      "COOLDOWN": {
+        "type": "string",
+        "description": "Minimum seconds between consecutive launches (numeric string)",
+        "default": "2"
+      }
+    }
+  }
+}

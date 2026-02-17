@@ -131,9 +131,57 @@ After initial setup, you can switch the target app at any time without re-runnin
 
 # Show current mapping
 ./switch.sh current [TV_IP:5555]
+
+# Show full system state (connection, daemon, config, script)
+./switch.sh status [TV_IP:5555]
 ```
 
 The config is stored at `/data/local/tmp/keyremap.conf` on the TV. The daemon re-reads it on each button press — no restart needed.
+
+## Agent / Automation Interface
+
+`switch.sh` supports a `--json` flag for structured output, making it usable by AI agents and scripts without regex parsing.
+
+```bash
+# JSON output for any subcommand
+./switch.sh --json status
+./switch.sh --json current
+./switch.sh --json list
+./switch.sh --json set <activity>
+```
+
+Example output (`--json status`):
+
+```json
+{
+  "connected": true,
+  "daemon": "running",
+  "config": {
+    "device": "/dev/input/event3",
+    "scancode_le": "53050c00",
+    "target": "top.yogiczy.mytv.tv/.MainActivity",
+    "cooldown": "2"
+  },
+  "script_installed": true
+}
+```
+
+### Exit Codes
+
+All `switch.sh` commands use semantic exit codes:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Invalid usage / bad arguments |
+| `2` | Cannot connect to TV (ADB unreachable) |
+| `3` | Not configured (no config file or no TARGET) |
+| `4` | Daemon not running (status only, informational) |
+| `5` | Config write failed |
+
+### Project Manifest
+
+`agent.json` at the repo root describes all commands, flags, exit codes, and config schema in a machine-readable format. Agents can read this file to discover available operations without parsing help text.
 
 ## Persistence (Surviving TV Reboots)
 
@@ -283,6 +331,7 @@ V="${CLEAN:40:8}"
 | `discover.sh` | PC/Mac/Linux | Discover button scancodes |
 | `install.sh` | PC/Mac/Linux | First-time deploy (auto-detects Sony partner key) |
 | `watchdog.sh` | Always-on host | Auto-restart after TV reboot |
+| `agent.json` | — | Machine-readable project manifest for AI agents |
 
 ## License
 
