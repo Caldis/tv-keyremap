@@ -1,4 +1,5 @@
 {
+  "schema_version": 1,
   "name": "tv-keyremap",
   "description": "Remap physical buttons on Android TV remotes to launch any app — no root required. Works by reading raw Linux input events via adb shell.",
   "prerequisites": {

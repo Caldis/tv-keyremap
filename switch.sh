@@ -20,6 +20,21 @@
 ADB="${ADB:-adb}"
 CONF_PATH="/data/local/tmp/keyremap.conf"
 
+# Helper: run adb shell without consuming stdin
+# MSYS_NO_PATHCONV prevents Git Bash on Windows from mangling /paths
+adb_sh() {
+  MSYS_NO_PATHCONV=1 "$ADB" -s "$TV" shell "$@" < /dev/null 2>/dev/null
+}
+
+# --- JSON helpers ---
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g' | tr -d '\n\r'
+}
+
+# Unified JSON envelope
+json_ok() { printf '{"ok":true,"error":null,"data":%s}\n' "$1"; }
+json_err() { printf '{"ok":false,"error":"%s","data":%s}\n' "$(json_escape "$1")" "${2:-null}"; }
+
 # --- Parse --json flag ---
 JSON=0
 if [ "$1" = "--json" ]; then
@@ -36,7 +51,7 @@ if [ "$CMD" = "set" ]; then
   SET_TARGET="$1"; shift
   if [ -z "$SET_TARGET" ]; then
     if [ "$JSON" = 1 ]; then
-      printf '{"error":"missing activity argument"}\n'
+      json_err "missing activity argument" 
     else
       echo "Usage: switch.sh set <activity> [adb_target]"
       echo "  e.g. switch.sh set com.example.app/.MainActivity"
@@ -47,22 +62,12 @@ fi
 
 TV="${1:-192.168.1.209:5555}"
 
-# Helper: run adb shell without consuming stdin
-# MSYS_NO_PATHCONV prevents Git Bash on Windows from mangling /paths
-adb_sh() {
-  MSYS_NO_PATHCONV=1 "$ADB" -s "$TV" shell "$@" < /dev/null 2>/dev/null
-}
-
-# --- JSON helper ---
-json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g' | tr -d '\n\r'
-}
 
 # --- Connect ---
 MSYS_NO_PATHCONV=1 "$ADB" connect "$TV" < /dev/null >/dev/null 2>&1
 if ! adb_sh echo ok >/dev/null; then
   if [ "$JSON" = 1 ]; then
-    printf '{"error":"cannot connect to TV","target":"%s"}\n' "$(json_escape "$TV")"
+    json_err "cannot connect to TV" "$(printf '{"target":"%s"}' "$(json_escape "$TV")")"
   else
     echo "ERROR: Cannot reach $TV"
   fi
@@ -93,12 +98,15 @@ if [ "$CMD" = "status" ]; then
   [ -n "$SCRIPT_CHECK" ] && SCRIPT_INSTALLED=true
 
   if [ "$JSON" = 1 ]; then
-    printf '{"connected":true,"daemon":"%s",' "$DAEMON_STATE"
-    printf '"config":{"device":"%s",' "$(json_escape "$C_DEVICE")"
-    printf '"scancode_le":"%s",' "$(json_escape "$C_SCANCODE")"
-    printf '"target":"%s",' "$(json_escape "$C_TARGET")"
-    printf '"cooldown":"%s"},' "$(json_escape "$C_COOLDOWN")"
-    printf '"script_installed":%s}\n' "$SCRIPT_INSTALLED"
+    _data=$(printf '{"connected":true,"daemon":"%s","config":{"device":"%s","scancode_le":"%s","target":"%s","cooldown":"%s"},"script_installed":%s}' \
+      "$DAEMON_STATE" "$(json_escape "$C_DEVICE")" "$(json_escape "$C_SCANCODE")" "$(json_escape "$C_TARGET")" "$(json_escape "$C_COOLDOWN")" "$SCRIPT_INSTALLED")
+    if [ -z "$CONF_RAW" ] || [ -z "$C_TARGET" ]; then
+      json_err "not configured" "$_data"; exit 3
+    elif [ -z "$DAEMON_CHECK" ]; then
+      json_err "daemon not running" "$_data"; exit 4
+    else
+      json_ok "$_data"; exit 0
+    fi
   else
     echo "=== tv-keyremap: Status ==="
     echo ""
@@ -122,14 +130,14 @@ fi
 if [ "$CMD" = "current" ]; then
   if [ -n "$CURRENT" ]; then
     if [ "$JSON" = 1 ]; then
-      printf '{"target":"%s"}\n' "$(json_escape "$CURRENT")"
+      json_ok "$(printf '{"target":"%s"}' "$(json_escape "$CURRENT")")"
     else
       echo "$CURRENT"
     fi
     exit 0
   else
     if [ "$JSON" = 1 ]; then
-      printf '{"target":null}\n'
+      json_err "not configured" '{"target":null}'
     else
       echo "(not configured)"
     fi
@@ -141,7 +149,7 @@ fi
 list_apps() {
   APPS=$(adb_sh pm list packages -3 | sed 's/package://' | tr -d '\r' | sort)
   if [ "$JSON" = 1 ]; then
-    printf '['
+    printf '{"ok":true,"error":null,"data":['
     FIRST=1
     for pkg in $APPS; do
       ACTIVITY=$(adb_sh "dumpsys package $pkg" | grep -B5 "LEANBACK_LAUNCHER\|android.intent.category.LAUNCHER" | grep "$pkg/" | head -n 1 | sed "s/.*\($pkg\/[^ ]*\).*/\1/" | tr -d ' \r')
@@ -153,7 +161,7 @@ list_apps() {
       printf '{"package":"%s","activity":"%s","current":%s}' \
         "$(json_escape "$pkg")" "$(json_escape "$ACTIVITY")" "$IS_CURRENT"
     done
-    printf ']\n'
+    printf ']}\n'
   else
     for pkg in $APPS; do
       ACTIVITY=$(adb_sh "dumpsys package $pkg" | grep -B5 "LEANBACK_LAUNCHER\|android.intent.category.LAUNCHER" | grep "$pkg/" | head -n 1 | sed "s/.*\($pkg\/[^ ]*\).*/\1/" | tr -d ' \r')
@@ -235,7 +243,7 @@ check_daemon() {
 if [ "$CMD" = "set" ]; then
   if ! write_config "$SET_TARGET"; then
     if [ "$JSON" = 1 ]; then
-      printf '{"ok":false,"error":"config write failed"}\n'
+      json_err "config write failed" 
     else
       echo "ERROR: Failed to write config."
     fi
@@ -243,8 +251,7 @@ if [ "$CMD" = "set" ]; then
   fi
   if [ "$JSON" = 1 ]; then
     DAEMON_STATUS=$(check_daemon)
-    printf '{"ok":true,"target":"%s","daemon":"%s"}\n' \
-      "$(json_escape "$SET_TARGET")" "$DAEMON_STATUS"
+    json_ok "$(printf '{"target":"%s","daemon":"%s"}' "$(json_escape "$SET_TARGET")" "$DAEMON_STATUS")"
   else
     echo "Config updated:"
     adb_sh cat "$CONF_PATH" | tr -d '\r'
@@ -255,7 +262,7 @@ fi
 
 # --- Interactive mode (no command) ---
 if [ "$JSON" = 1 ]; then
-  printf '{"error":"interactive mode not supported with --json, use a subcommand"}\n'
+  json_err "interactive mode not supported with --json, use a subcommand" 
   exit 1
 fi
 

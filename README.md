@@ -140,7 +140,7 @@ The config is stored at `/data/local/tmp/keyremap.conf` on the TV. The daemon re
 
 ## Agent / Automation Interface
 
-`switch.sh` supports a `--json` flag for structured output, making it usable by AI agents and scripts without regex parsing.
+`switch.sh` supports a `--json` flag for structured output, making it usable by AI agents and scripts without regex parsing. All JSON responses use a unified envelope:
 
 ```bash
 # JSON output for any subcommand
@@ -154,15 +154,19 @@ Example output (`--json status`):
 
 ```json
 {
-  "connected": true,
-  "daemon": "running",
-  "config": {
-    "device": "/dev/input/event3",
-    "scancode_le": "53050c00",
-    "target": "top.yogiczy.mytv.tv/.MainActivity",
-    "cooldown": "2"
-  },
-  "script_installed": true
+  "ok": true,
+  "error": null,
+  "data": {
+    "connected": true,
+    "daemon": "running",
+    "config": {
+      "device": "/dev/input/event3",
+      "scancode_le": "53050c00",
+      "target": "top.yogiczy.mytv.tv/.MainActivity",
+      "cooldown": "2"
+    },
+    "script_installed": true
+  }
 }
 ```
 
