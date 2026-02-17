@@ -115,6 +115,22 @@ See [Brand-Specific Notes](#brand-specific-notes) below for your TV brand.
 
 Press the remapped button. Your app should launch without any toast from the original handler.
 
+## Switching Apps
+
+After initial setup, you can switch the target app at any time without re-running the full install:
+
+```bash
+./switch.sh <TV_IP>:5555
+```
+
+This will:
+1. Show all installed apps on the TV
+2. Let you pick one interactively
+3. Write the config to the TV
+4. The daemon picks up the change on the next button press — no restart needed
+
+The config is stored at `/data/local/tmp/keyremap.conf` on the TV and persists across daemon restarts and TV reboots.
+
 ## Persistence (Surviving TV Reboots)
 
 The keyremap daemon runs as a shell process on the TV. It will be killed when the TV reboots. To auto-restart it, use the watchdog script on an always-on host.
@@ -135,14 +151,26 @@ With custom config:
 
 ## Configuration
 
-All configuration is via environment variables (with defaults in `keyremap.sh`):
+Config is stored on the TV at `/data/local/tmp/keyremap.conf`. The daemon re-reads it on each button press, so changes take effect immediately.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `KEYREMAP_DEVICE` | `/dev/input/event3` | Linux input device for the remote |
-| `KEYREMAP_SCANCODE_LE` | `53050c00` | Target scancode in little-endian hex |
-| `KEYREMAP_TARGET` | `com.xiaodianshi.tv.yst/.ui.main.MainActivity` | App activity to launch |
-| `KEYREMAP_COOLDOWN` | `2` | Minimum seconds between launches |
+```ini
+# /data/local/tmp/keyremap.conf
+DEVICE=/dev/input/event3
+SCANCODE_LE=53050c00
+TARGET=com.xiaodianshi.tv.yst/.ui.main.MainActivity
+COOLDOWN=2
+```
+
+You can also override via environment variables (useful for watchdog):
+
+| Variable | Description |
+|----------|-------------|
+| `KEYREMAP_DEVICE` | Linux input device for the remote |
+| `KEYREMAP_SCANCODE_LE` | Target scancode in little-endian hex |
+| `KEYREMAP_TARGET` | App activity to launch |
+| `KEYREMAP_COOLDOWN` | Minimum seconds between launches |
+
+Priority: conf file > env vars > built-in defaults.
 
 ## Brand-Specific Notes
 
@@ -247,9 +275,10 @@ V="${CLEAN:40:8}"
 | File | Runs On | Description |
 |------|---------|-------------|
 | `keyremap.sh` | Android TV (via adb) | Main remap daemon — generic, works on any Android TV |
-| `discover.sh` | PC/Mac/Linux | Discover button scancodes — generic |
-| `install.sh` | PC/Mac/Linux | One-step deploy (auto-detects Sony partner key) |
-| `watchdog.sh` | Always-on host | Auto-restart after TV reboot — generic |
+| `switch.sh` | PC/Mac/Linux | Interactively switch the target app |
+| `discover.sh` | PC/Mac/Linux | Discover button scancodes |
+| `install.sh` | PC/Mac/Linux | First-time deploy (auto-detects Sony partner key) |
+| `watchdog.sh` | Always-on host | Auto-restart after TV reboot |
 
 ## License
 

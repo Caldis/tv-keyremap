@@ -52,8 +52,17 @@ echo "[✓] Input device: $DEVICE"
 $ADB -s "$TV" push keyremap.sh "$REMOTE_DIR/keyremap.sh" >/dev/null 2>&1
 echo "[✓] Pushed keyremap.sh"
 
+# Write config file
+$ADB -s "$TV" shell "cat > $REMOTE_DIR/keyremap.conf << 'CONF'
+DEVICE=$DEVICE
+SCANCODE_LE=$SCANCODE_LE
+TARGET=$TARGET_ACTIVITY
+COOLDOWN=2
+CONF" 2>/dev/null
+echo "[✓] Config written to $REMOTE_DIR/keyremap.conf"
+
 # Find the partner key package (Sony-specific)
-PARTNERKEY=$($ADB -s "$TV" shell pm list packages 2>/dev/null | grep "partnerkey" | sed 's/package://')
+PARTNERKEY=$($ADB -s "$TV" shell pm list packages 2>/dev/null | grep "partnerkey" | sed 's/package://' | tr -d '\r')
 if [ -n "$PARTNERKEY" ]; then
   echo "[i] Found partner key package: $PARTNERKEY"
   echo "    Suppressing its toast notifications..."
@@ -68,7 +77,7 @@ for PID in $($ADB -s "$TV" shell ps 2>/dev/null | grep "shell.*dd$" | awk '{prin
 done
 
 # Start keyremap
-$ADB -s "$TV" shell "KEYREMAP_DEVICE=$DEVICE KEYREMAP_SCANCODE_LE=$SCANCODE_LE KEYREMAP_TARGET=$TARGET_ACTIVITY setsid sh $REMOTE_DIR/keyremap.sh < /dev/null > /dev/null 2>&1 &" </dev/null >/dev/null 2>&1
+$ADB -s "$TV" shell "setsid sh $REMOTE_DIR/keyremap.sh < /dev/null > /dev/null 2>&1 &" </dev/null >/dev/null 2>&1
 sleep 3
 
 # Verify
@@ -84,5 +93,5 @@ echo ""
 echo "=== Install Complete ==="
 echo "Press the remapped button to test."
 echo ""
-echo "To make this persistent across TV reboots, set up the watchdog."
-echo "See watchdog.sh and README.md for details."
+echo "To switch the target app later:  ./switch.sh $TV"
+echo "To persist across TV reboots:    set up watchdog.sh (see README.md)"
